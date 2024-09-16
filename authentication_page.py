@@ -1,32 +1,68 @@
-# authentication_page.py
 import flet as ft
 import requests
+#from typing import Tuple
 
-# Função para fazer a requisição de login
-def login_request(matricula, senha):
-    url = "http://localhost:8000/api/login/"  # URL da sua API de login
+def login_request(matricula: ft.Page, colaborador: ft.Page):
+    """Envia uma requisição POST para autenticar o usuário e retorna o resultado."""
     data = {
-        "matricula": matricula.value,
-        "password": senha.value
+        'nome': matricula,
+        'senha': ''
     }
 
-    try:
-        response = requests.post(url, json=data)
-        if response.status_code == 200:
-            print("Login bem-sucedido!")
-            return True, "Login efetuado com sucesso!"
-        elif response.status_code == 401:
-            return False, "Credenciais inválidas. Verifique sua matrícula e senha."
-        elif response.status_code == 404:
-            return False, "Usuário não cadastrado. Entre em contato com a supervisão."
-        else:
-            return False, f"Erro de login: {response.status_code}"
-    except Exception as e:
-        return False, f"Erro ao conectar com a API: {e}"
+    response = requests.post('http://localhost:8000/colaborador/colaborador/', json=data)
     
-# Função para exibir a página de autenticação
-def show_authentication_page(page):
-    # Criação do container da página de autenticação
+    # Verifica o status da resposta
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            success = data.get('success', False)  # Espera-se um booleano
+            message = data.get('message', 'Erro desconhecido')  # Espera-se uma string
+            return success, message
+        except requests.exceptions.JSONDecodeError:
+            return False, 'Erro ao processar a resposta do servidor'
+    else:
+        return False, f'Erro no servidor: {response.status_code}'
+ 
+
+def show_authentication_page(page: ft.Page) -> None:
+    """Exibe a página de autenticação e lida com o login do usuário."""
+    
+    # Definindo o tamanho da janela
+    page.window.width = 450
+    page.window.height = 700
+
+    matricula_field = ft.TextField(
+        label='Matricula',
+        width=250,
+        key='matricula_field'
+    )
+
+    senha_field = ft.TextField(
+        label='Senha',
+        password=True,
+        width=250,
+        key='senha_field'
+    )
+
+    def on_login_click(e: ft.ControlEvent) -> None:
+        """Ação a ser realizada quando o botão de login é clicado."""
+        matricula_value = matricula_field.value
+        senha_value = senha_field.value
+        success, message = login_request(matricula_value, senha_value)
+        
+        if success:
+            from option_pages import show_options_page
+            show_options_page(page)
+        else:
+            # Exibir mensagem de erro como SnackBar corretamente
+            snack_bar = ft.SnackBar(
+                content=ft.Text(message),
+                open=True
+            )
+            
+            page.snack_bar = snack_bar  # Define o snack_bar no objeto page
+            page.update()  # Atualiza a página para exibir o snack_bar
+
     auth_page = ft.Container(
         width=400,
         height=600,
@@ -39,41 +75,34 @@ def show_authentication_page(page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=20,
             controls=[
-                                # Adiciona a primeira imagem (logo.png) ao topo
                 ft.Image(
                     src='assets/image/logo.png',
-                    width=100,  # Ajuste o tamanho da imagem conforme necessário
+                    width=100,
                     height=100,
                     fit=ft.ImageFit.CONTAIN
-                ),  # Garante que a imagem se ajuste sem distorção
+                ),
                 ft.Text(
                     value='Autenticação',
                     color='black',
                     size=24,
                     weight=ft.FontWeight.BOLD
                 ),
-                # Campo de login
-                ft.TextField(
-                    label='Matricula',
-                    width=250
-                ),
-                # Campo de senha
-                ft.TextField(
-                    label='Senha',
-                    password=True,
-                    width=250
-                ),
-                # Botão de login
+                matricula_field,
+                senha_field,
                 ft.ElevatedButton(
                     text="Entrar",
                     bgcolor='#041955',
                     color='white',
-                    on_click=lambda e: print("Login efetuado!")  # Lógica de autenticação aqui
+                    on_click=on_login_click
                 )
             ]
         )
     )
-    # Atualiza o conteúdo da página para exibir a página de autenticação
+
     page.controls.clear()
     page.add(auth_page)
     page.update()
+
+
+
+
